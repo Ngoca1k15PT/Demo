@@ -8,7 +8,7 @@ const ExerciseScreen = () => {
         <View style={styles.iconContainer}>
           <Text style={styles.databaseIcon}>⊙</Text>
         </View>
-        <Text style={styles.bookText}>books</Text>
+        <Text style={styles.bookText}>book</Text>
       </View>
 
       <View style={styles.mainContent}>

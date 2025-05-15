@@ -2,7 +2,12 @@ import * as React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Dimensions, TextInput } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-const QueryScreen = () => {
+interface QueryScreenProps {
+  setActiveTab: (tab: string) => void;
+  setSqlQuery: (query: string) => void;
+}
+
+const QueryScreen: React.FC<QueryScreenProps> = ({ setActiveTab, setSqlQuery }) => {
   const [query, setQuery] = React.useState<string>('');
   const webViewRef = React.useRef<WebView>(null);
 
@@ -64,7 +69,7 @@ const QueryScreen = () => {
         <script>
           // Sample table structure for SQL hints
           const tables = {
-            books: ["id", "title", "author", "published_date", "genre", "price", "is_available"],
+            book: ["id", "title", "author", "published_date", "genre", "price", "is_available"],
             authors: ["id", "name", "birth_date", "nationality", "biography"],
             genres: ["id", "name", "description"],
             publishers: ["id", "name", "address", "founded_year"]
@@ -183,7 +188,21 @@ const QueryScreen = () => {
   // Execute query
   const handleRunQuery = () => {
     console.log('Running query:', query);
-    // Add your query execution logic here
+    // Set the query and navigate to the result screen
+    setSqlQuery(query);
+    setActiveTab('Result');
+  };
+
+  // Submit query
+  const handleSubmitQuery = () => {
+    if (query.trim() === '') {
+      // If query is empty, show a default query
+      const defaultQuery = 'SELECT * FROM book';
+      setSqlQuery(defaultQuery);
+    } else {
+      setSqlQuery(query);
+    }
+    setActiveTab('Result');
   };
 
   return (
@@ -192,7 +211,7 @@ const QueryScreen = () => {
         <View style={styles.iconContainer}>
           <Text style={styles.databaseIcon}>⊙</Text>
         </View>
-        <Text style={styles.bookText}>books</Text>
+        <Text style={styles.bookText}>book</Text>
       </View>
       
       <View style={styles.queryEditorContainer}>
@@ -223,7 +242,7 @@ const QueryScreen = () => {
             <Text style={styles.runButtonText}>Run</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.submitButton}>
+          <TouchableOpacity style={styles.submitButton} onPress={handleSubmitQuery}>
             <Text style={styles.submitButtonText}>Submit</Text>
           </TouchableOpacity>
         </View>

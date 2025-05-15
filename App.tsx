@@ -3,9 +3,16 @@ import { StyleSheet, SafeAreaView, Text, View, TouchableOpacity, Image, StatusBa
 import ExerciseScreen from './app/screens/ExerciseScreen';
 import QueryScreen from './app/screens/QueryScreen';
 import ResultScreen from './app/screens/ResultScreen';
+import { initDatabase } from './app/database/DatabaseHelper';
 
 const App = () => {
   const [activeTab, setActiveTab] = React.useState('Exercise');
+  const [sqlQuery, setSqlQuery] = React.useState<string>('');
+
+  // Initialize database when app starts
+  React.useEffect(() => {
+    initDatabase();
+  }, []);
 
   // Hiển thị màn hình dựa trên tab đang active
   const renderScreen = () => {
@@ -13,9 +20,9 @@ const App = () => {
       case 'Exercise':
         return <ExerciseScreen />;
       case 'Query':
-        return <QueryScreen />;
+        return <QueryScreen setActiveTab={setActiveTab} setSqlQuery={setSqlQuery} />;
       case 'Result':
-        return <ResultScreen />;
+        return <ResultScreen setActiveTab={setActiveTab} sqlQuery={sqlQuery} />;
       default:
         return <ExerciseScreen />;
     }
@@ -61,7 +68,7 @@ const App = () => {
       {renderScreen()}
 
       {activeTab === 'Exercise' && (
-        <TouchableOpacity style={styles.continueButton}>
+        <TouchableOpacity style={styles.continueButton} onPress={() => setActiveTab('Query')}>
           <Text style={styles.continueText}>Continue</Text>
         </TouchableOpacity>
       )}
