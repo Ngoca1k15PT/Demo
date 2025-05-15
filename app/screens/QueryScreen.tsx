@@ -1,46 +1,189 @@
 import * as React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList } from 'react-native';
-import Autocomplete from 'react-native-autocomplete-input';
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions, TextInput } from 'react-native';
+import { WebView } from 'react-native-webview';
 
 const QueryScreen = () => {
   const [query, setQuery] = React.useState<string>('');
-  const [suggestions, setSuggestions] = React.useState<string[]>([]);
+  const webViewRef = React.useRef<WebView>(null);
 
-  // SQL Keywords for autocompletion
-  const sqlKeywords = [
-    'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING', 
-    'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'LIMIT',
-    'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM',
-    'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'INDEX', 'VIEW',
-    'AND', 'OR', 'NOT', 'NULL', 'IS NULL', 'IS NOT NULL',
-    'COUNT', 'AVG', 'SUM', 'MIN', 'MAX', 'DISTINCT',
-    'AS', 'IN', 'BETWEEN', 'LIKE', 'DESC', 'ASC'
-  ];
+  // HTML content for embedding CodeMirror in WebView
+  const codeMirrorHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+        <style>
+          html, body, #editor {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color:rgb(255, 255, 255);
+          }
+          .CodeMirror {
+            // height: 100%;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100% !important;
+            font-size: 16px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+          }
+          .cm-hint {
+            font-size: 14px;
+            padding: 4px 8px;
+          }
+          .CodeMirror-hints {
+            // z-index: 1000;
+            max-height: 200px;
+          }
+          textarea {
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            font-size: 16px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            padding: 8px;
+          }
+        </style>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/theme/dracula.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/hint/show-hint.min.css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/mode/sql/sql.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/hint/show-hint.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/hint/sql-hint.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/edit/matchbrackets.min.js"></script>
+      </head>
+      <body>
+        <div id="editor"></div>
+        <script>
+          // Sample table structure for SQL hints
+          const tables = {
+            books: ["id", "title", "author", "published_date", "genre", "price", "is_available"],
+            authors: ["id", "name", "birth_date", "nationality", "biography"],
+            genres: ["id", "name", "description"],
+            publishers: ["id", "name", "address", "founded_year"]
+          };
 
-  // Function to filter suggestions based on current query
-  const getSuggestions = (text: string): string[] => {
-    const lastWord = text.split(' ').pop()?.toUpperCase() || '';
-    if (lastWord.length > 0) {
-      return sqlKeywords.filter(keyword => 
-        keyword.startsWith(lastWord) && keyword !== lastWord
-      );
+          // Simple fallback to a plain textarea if needed
+          function setupPlainTextarea() {
+            const textarea = document.createElement('textarea');
+            textarea.placeholder = 'Enter SQL query here...';
+            document.getElementById('editor').appendChild(textarea);
+            
+            textarea.addEventListener('input', function() {
+              window.ReactNativeWebView.postMessage(
+                JSON.stringify({ type: 'content', value: textarea.value })
+              );
+            });
+            
+            // Function to set textarea value from React Native
+            window.setEditorValue = function(value) {
+              textarea.value = value;
+            };
+          }
+
+          // Try to initialize CodeMirror with textarea mode
+          try {
+            var editor = CodeMirror(document.getElementById('editor'), {
+              mode: 'text/x-sql',
+              theme: 'dracula',
+              lineNumbers: true,
+              indentWithTabs: true,
+              smartIndent: true,
+              lineWrapping: true,
+              matchBrackets: true,
+              autofocus: true,
+              viewportMargin: Infinity,
+              inputStyle: 'textarea',
+              hintOptions: {
+                tables: tables,
+                completeSingle: true,
+                completeOnSingleClick: true
+              }
+            });
+            
+            // Simple extraKeys configuration
+            editor.setOption("extraKeys", {
+              "Ctrl-Space": "autocomplete",
+              "Tab": function(cm) {
+                var spaces = Array(cm.getOption("indentUnit") + 1).join(" ");
+                cm.replaceSelection(spaces);
+              }
+            });
+            
+            // Enable automatic hinting
+            editor.on('keyup', function(cm, event) {
+              // Don't hint on these keys
+              const ignoreKeys = [
+                13, // Enter
+                27, // Escape
+                37, // Left
+                38, // Up
+                39, // Right
+                40, // Down
+                16, // Shift
+                17, // Ctrl
+                18, // Alt
+                91, // Command
+                9 , // Tab
+                8, // Backspace
+                46, // Delete
+                33, // Page Up
+                34, // Page Down
+                35, // End
+                36, // Home
+                116, // Refresh
+                114, // Reload
+              ];
+              
+              if (!cm.state.completionActive && 
+                  !ignoreKeys.includes(event.keyCode)) {
+                CodeMirror.commands.autocomplete(cm);
+              }
+            });
+
+            // Send editor content to React Native on change
+            editor.on('change', function() {
+              window.ReactNativeWebView.postMessage(
+                JSON.stringify({ type: 'content', value: editor.getValue() })
+              );
+            });
+            
+            // Function to set editor content from React Native
+            window.setEditorValue = function(value) {
+              editor.setValue(value);
+            };
+          } catch (e) {
+            console.error('Failed to initialize CodeMirror:', e);
+            setupPlainTextarea();
+          }
+        </script>
+      </body>
+    </html>
+  `;
+
+  // Handle messages from WebView
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      if (message.type === 'content') {
+        setQuery(message.value);
+      }
+    } catch (error) {
+      console.error('Error parsing WebView message:', error);
     }
-    return [];
   };
 
-  // Handle text change and update suggestions
-  const handleQueryChange = (text: string): void => {
-    setQuery(text);
-    setSuggestions(getSuggestions(text));
-  };
-
-  // Handle suggestion selection
-  const handleSelectSuggestion = (suggestion: string): void => {
-    const words = query.split(' ');
-    words.pop();
-    const newQuery = [...words, suggestion, ''].join(' ');
-    setQuery(newQuery);
-    setSuggestions([]);
+  // Execute query
+  const handleRunQuery = () => {
+    console.log('Running query:', query);
+    // Add your query execution logic here
   };
 
   return (
@@ -53,30 +196,18 @@ const QueryScreen = () => {
       </View>
       
       <View style={styles.queryEditorContainer}>
-        <View style={styles.autocompleteContainer}>
-          <Autocomplete
-            data={suggestions}
-            defaultValue={query}
-            onChangeText={handleQueryChange}
-            placeholder="Type your SQL query here..."
-            placeholderTextColor="#2196f3"
-            flatListProps={{
-              keyboardShouldPersistTaps: 'always',
-              keyExtractor: (item) => item,
-              renderItem: ({ item }) => (
-                <TouchableOpacity 
-                  style={styles.suggestionItem} 
-                  onPress={() => handleSelectSuggestion(item)}
-                >
-                  <Text style={styles.suggestionText}>{item}</Text>
-                </TouchableOpacity>
-              ),
-            }}
-            inputContainerStyle={styles.inputContainerStyle}
-            containerStyle={styles.autocompleteContainerStyle}
-            style={styles.sqlInput}
+          <WebView
+            ref={webViewRef}
+            originWhitelist={['*']}
+            source={{ html: codeMirrorHtml }}
+            onMessage={handleWebViewMessage}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            keyboardDisplayRequiresUserAction={false}
+            startInLoadingState={true}
+            scrollEnabled={false}
+            style={styles.webView}
           />
-        </View>
       </View>
       
       <View style={styles.bottomContainer}>
@@ -85,7 +216,10 @@ const QueryScreen = () => {
             <Text style={styles.helpButtonText}>?</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.runButton}>
+          <TouchableOpacity 
+            style={styles.runButton}
+            onPress={handleRunQuery}
+          >
             <Text style={styles.runButtonText}>Run</Text>
           </TouchableOpacity>
           
@@ -129,54 +263,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  toggleButton: {
+    backgroundColor: '#f0f0f0',
+    padding: 8,
+    marginHorizontal: 16,
+    borderRadius: 4,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    color: '#333',
+  },
   queryEditorContainer: {
     flex: 1,
     backgroundColor: 'white',
+    overflow: 'hidden',
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  nativeTextarea: {
+    flex: 1,
+    backgroundColor: 'white',
     padding: 16,
-  },
-  autocompleteContainer: {
-    flex: 1,
-    position: 'relative',
-    zIndex: 1,
-  },
-  autocompleteContainerStyle: {
-    flex: 1,
-  },
-  inputContainerStyle: {
-    borderWidth: 0,
-  },
-  suggestionItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-    backgroundColor: '#f8f8f8',
-  },
-  suggestionText: {
+    textAlignVertical: 'top',
     fontSize: 16,
-    color: '#2196f3',
-  },
-  sqlLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  sqlKeyword: {
-    color: '#2196f3',
-    fontSize: 18,
-    fontWeight: '500',
-  },
-  sqlOperator: {
-    fontSize: 18,
-  },
-  sqlText: {
-    fontSize: 18,
-    color: '#333',
-  },
-  sqlInput: {
-    fontSize: 18,
-    paddingVertical: 4,
-    color: '#2196f3',
-    width: '100%',
+    fontFamily: 'monospace',
   },
   bottomContainer: {
     padding: 16,
