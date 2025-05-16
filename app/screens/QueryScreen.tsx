@@ -20,8 +20,8 @@ const QueryScreen: React.FC<QueryScreenProps> = ({ setActiveTab, setSqlQuery }) 
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
         <style>
           html, body, #editor {
-            margin: 0;
-            padding: 0;
+            // margin: 0;
+            // padding: 0;
             width: 100%;
             height: 100%;
             overflow: hidden;
@@ -35,24 +35,64 @@ const QueryScreen: React.FC<QueryScreenProps> = ({ setActiveTab, setSqlQuery }) 
             left: 0;
             right: 0;
             height: 100% !important;
-            font-size: 16px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-size: 22px;
+            font-family: 'Courier New', Courier, monospace;
           }
           .cm-hint {
-            font-size: 14px;
-            padding: 4px 8px;
+            font-size: 24px !important;
+            padding: 10px 15px;
+            margin: 4px;
+            font-weight: bold;
           }
           .CodeMirror-hints {
             // z-index: 1000;
-            max-height: 200px;
+            max-height: 300px;
+            width: auto !important;
+            min-width: 250px;
+            padding: 5px;
+            border: 2px solid #ddd;
+            border-radius: 10px !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+          }
+          .CodeMirror-hints .CodeMirror-hint {
+            font-size: 24px !important;
+            border-top-left-radius: 10px !important;
+            border-top-right-radius: 10px !important;
+            padding: 8px 12px;
+            font-family: 'Courier New', Courier, monospace;
           }
           textarea {
             width: 100%;
             height: 100%;
             box-sizing: border-box;
             font-size: 16px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-family: 'Courier New', Courier, monospace;
             padding: 8px;
+          }
+          .CodeMirror-activeline-background {
+            background: transparent !important;
+            border: 1px solid #ccc;
+          }
+          .cm-keyword {
+            color: #0066ff !important;
+            font-weight: bold;
+          }
+          .cm-def {
+            color: #0066ff !important;
+          }
+          .cm-variable {
+            color: #0066ff !important;
+          }
+          .cm-operator {
+            color: #0066ff !important;
+          }
+          .cm-number {
+            color: #0066ff !important;
+          }
+          .cm-string {
+            color: #0066ff !important;
           }
         </style>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.css">
@@ -63,7 +103,8 @@ const QueryScreen: React.FC<QueryScreenProps> = ({ setActiveTab, setSqlQuery }) 
         <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/hint/show-hint.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/hint/sql-hint.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/edit/matchbrackets.min.js"></script>
-      </head>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/selection/active-line.min.js"></script>
+          </head>
       <body>
         <div id="editor"></div>
         <script>
@@ -95,10 +136,10 @@ const QueryScreen: React.FC<QueryScreenProps> = ({ setActiveTab, setSqlQuery }) 
 
           // Try to initialize CodeMirror with textarea mode
           try {
-            var editor = CodeMirror(document.getElementById('editor'), {
+            const editor = CodeMirror(document.getElementById('editor'), {
               mode: 'text/x-sql',
-              theme: 'dracula',
-              lineNumbers: true,
+              theme: 'default',
+              // lineNumbers: true,
               indentWithTabs: true,
               smartIndent: true,
               lineWrapping: true,
@@ -106,9 +147,10 @@ const QueryScreen: React.FC<QueryScreenProps> = ({ setActiveTab, setSqlQuery }) 
               autofocus: true,
               viewportMargin: Infinity,
               inputStyle: 'textarea',
+              styleActiveLine: true,
               hintOptions: {
                 tables: tables,
-                completeSingle: true,
+                completeSingle: false,
                 completeOnSingleClick: true
               }
             });
@@ -149,7 +191,13 @@ const QueryScreen: React.FC<QueryScreenProps> = ({ setActiveTab, setSqlQuery }) 
               
               if (!cm.state.completionActive && 
                   !ignoreKeys.includes(event.keyCode)) {
-                CodeMirror.commands.autocomplete(cm);
+                // Only show hints if there's some text to match against
+                const cursor = cm.getCursor();
+                const token = cm.getTokenAt(cursor);
+                
+                if (token.string && token.string.length > 0 && token.string !== ' ') {
+                  CodeMirror.commands.autocomplete(cm);
+                }
               }
             });
 
